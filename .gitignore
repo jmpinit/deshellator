@@ -1,0 +1,9 @@
+# binaries
+*.bin
+*.hex
+bin/
+obj/
+
+# Vim
+*.swp
+*.swo
