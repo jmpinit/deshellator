@@ -4,6 +4,7 @@
 
 #include "uart.h"
 #include "tilp.h"
+#include "image.h"
 
 #define BLINK_DELAY_MS 1000
 
@@ -76,12 +77,12 @@ int main(void) {
     //execute("hi", hello, sizeof(hello));
     //uart_tx_str("done programming\r\n");
 
-    uint8_t v = 133;
     for (;;) {
-        tilp_spi(v);
-    }
+        for (int i = 0; i < 768; i++) {
+            tilp_spi(image_test2[i]);
+        }
+        tilp_init();
 
-    for (;;) {
         PORTC.OUTSET = 1 << 2; // set the output high.
         _delay_ms(BLINK_DELAY_MS);
 
