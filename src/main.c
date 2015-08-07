@@ -73,8 +73,13 @@ int main(void) {
     tilp_init();
 
     uart_tx_str("hello world!\r\n");
-    execute("hi", hello, sizeof(hello));
-    uart_tx_str("done programming\r\n");
+    //execute("hi", hello, sizeof(hello));
+    //uart_tx_str("done programming\r\n");
+
+    uint8_t v = 133;
+    for (;;) {
+        tilp_spi(v);
+    }
 
     for (;;) {
         PORTC.OUTSET = 1 << 2; // set the output high.

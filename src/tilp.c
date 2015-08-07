@@ -50,6 +50,19 @@ void tilp_press(uint16_t button) {
     uart_tx_str("\r\n");
 }
 
+void tilp_spi(uint8_t v) {
+    for (int bit = 0; bit < 8; bit++) {
+        tilp_wait_ring_low();
+
+        if (v & (0x80 >> bit))
+            tilp_tip_high();
+        else
+            tilp_tip_low();
+
+        tilp_wait_ring_high();
+    }
+}
+
 void tilp_receive_packet() {
     for (unsigned char i = 0; i < 4; i++) {
         packet[i] = tilp_rx();
