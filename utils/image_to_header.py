@@ -20,11 +20,12 @@ if not width == 96 or not height == 64:
 bytes = []
 
 for y in range(0, height):
-    for x in range(0, width / 8):
+    for byteIndex in range(0, width / 8):
         byte = 0
 
         for bit in range(0, 8):
-            r, g, b = rgb_im.getpixel((x + bit, y))
+            x = byteIndex * 8 + bit
+            r, g, b = rgb_im.getpixel((x, y))
             v = (r + g + b) / 3.0
 
             if v < 128:
@@ -37,7 +38,7 @@ guard = "H_{uppername}".format(uppername=name.upper())
 
 sys.stdout.write("#ifndef {guard}\r\n".format(guard=guard))
 sys.stdout.write("#define {guard}\r\n\r\n".format(guard=guard))
-sys.stdout.write("image_{name}[] = {{\r\n\t".format(name=name))
+sys.stdout.write("uint8_t image_{name}[] = {{\r\n\t".format(name=name))
 
 linepos = 0
 for i in range(0, len(bytes)):
@@ -49,5 +50,5 @@ for i in range(0, len(bytes)):
         sys.stdout.write("\r\n\t")
         linepos = 0
 
-sys.stdout.write("\r\n}\r\n\r\n")
+sys.stdout.write("\r\n};\r\n\r\n")
 sys.stdout.write("#endif")
