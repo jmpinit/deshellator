@@ -3,6 +3,7 @@
 #include <avr/xmega.h>
 
 #include "uart.h"
+#include "nrf24l01.h"
 #include "tilp.h"
 #include "image.h"
 
@@ -71,6 +72,17 @@ int main(void) {
     PORTC.DIRSET = 1 << 2;
 
     uart_init(9600);
+    rf_init();
+
+    for (;;) {
+        uint8_t data[1] = { RF_CMD_NOP };
+        rf_transfer(data, 1);
+        uint8_t status = data[0];
+        uart_tx_hex(status);
+        uart_tx_str("\r\n");
+        _delay_ms(1000);
+    }
+
     tilp_init();
 
     uart_tx_str("hello world!\r\n");

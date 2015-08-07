@@ -16,6 +16,7 @@ MAP := $(OBJDIR)$(S)$(NAME).map
 
 SOURCES =	main.c \
 			uart.c \
+			nrf24l01.c \
 			tilp.c
 			
 INCLUDES = -Isrc$(S)inc
