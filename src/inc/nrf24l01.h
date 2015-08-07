@@ -21,9 +21,20 @@
 #define RF_CMD_W_TX_PAYLOAD_NO_ACK  0xB0
 #define RF_CMD_NOP                  0xFF
 
-void rf_init(void);
-int rf_available(void);
+#define RF_REG_CONFIG   0x00
+#define RF_REG_STATUS   0x07
+#define RF_REG_RX_PW_P0 0x11
+
+#define PWR_UP  1
+#define PRIM_RX 0
+
+void rf_init_rx(void);
+void rf_init_tx(void);
 //int rf_rx(void);
 void rf_transfer(uint8_t* data, int len);
+void rf_write_reg(uint8_t addr, uint8_t value);
+void rf_mode_rx(void);
+uint8_t rf_rx(void);
+uint8_t rf_available(void);
 
 #endif

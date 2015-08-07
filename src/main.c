@@ -72,14 +72,29 @@ int main(void) {
     PORTC.DIRSET = 1 << 2;
 
     uart_init(9600);
-    rf_init();
+    rf_init_rx();
+
+    uart_tx_hex(rf_read_reg(RF_REG_CONFIG));
+    uart_tx_str("\r\n");
 
     for (;;) {
         uint8_t data[1] = { RF_CMD_NOP };
         rf_transfer(data, 1);
         uint8_t status = data[0];
         uart_tx_hex(status);
+
+        if (status & 0x40) {
+            // data received
+            rf_disable();
+            uint8_t read[2] = { RF_CMD_R_RX_PAYLOAD, 0 };
+            rf_transfer(read, sizeof(read));
+            uart_tx_str(", read ");
+            uart_tx_hex(read[1]);
+            rf_write_reg(RF_REG_STATUS, 0x40);
+            rf_enable();
+        }
         uart_tx_str("\r\n");
+
         _delay_ms(1000);
     }
 
