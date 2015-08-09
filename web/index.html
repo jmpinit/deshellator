@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>deshellator</title>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body>
+    <h1>Deshellator Renderer</h1>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script src="js/three.min.js"></script>
+    <script id="fragmentShader" type="x-shader/x-fragment">
+		uniform float time;
+		uniform vec2 resolution;
+        uniform sampler2D texture1;
+
+        varying vec2 texCoord;
+
+        void main(void) {
+            gl_FragColor = texture2D(texture1, texCoord);
+        }
+	</script>
+	<script id="vertexShader" type="x-shader/x-vertex">
+        varying vec2 texCoord;
+
+        void main() {
+            texCoord = uv;
+
+            gl_Position =   projectionMatrix *
+                            modelViewMatrix *
+                            vec4(position,1.0);
+        }
+	</script>
+    <script>
+        var renderer, mesh, scene, camera;
+        var calcCanvas;
+
+        init();
+        animate();
+
+        function init() {
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 10000);
+            camera.position.z = 1000;
+
+            scene = new THREE.Scene();
+            var loader = new THREE.JSONLoader();
+
+            loader.load("models/cube-blended.json", function(geometry, materials) {
+                var material = new THREE.ShaderMaterial({
+                	uniforms: {
+                		time: { type: "f", value: 1.0 },
+                		resolution: { type: "v2", value: new THREE.Vector2() },
+                        texture1: { type: "t", value: materials[0].map }
+                	},
+                	vertexShader: document.getElementById('vertexShader').textContent,
+                	fragmentShader: document.getElementById('fragmentShader').textContent
+                });
+
+                mesh = new THREE.Mesh(geometry, material);
+                mesh.scale.set(15, 15, 15);
+                mesh.position.y = 0;
+                mesh.position.x = 0;
+                mesh.position.z = 900;
+
+                scene.add(mesh);
+            });
+
+            var ambientLight = new THREE.AmbientLight(0x555555);
+            scene.add(ambientLight);
+
+            var directionalLight = new THREE.DirectionalLight(0xffffff);
+            directionalLight.position.set(1, 1, 1).normalize();
+            scene.add(directionalLight);
+
+            renderer = new THREE.WebGLRenderer();
+            renderer.setSize(94, 64);
+
+            document.body.appendChild(renderer.domElement);
+
+            // create canvas for calculator image
+            calcCanvas = document.createElement('canvas');
+            calcCanvas.width = 96;
+            calcCanvas.height = 64;
+            document.body.appendChild(calcCanvas);
+        }
+
+        function animate() {
+            // render
+            requestAnimationFrame(animate);
+            mesh.rotation.y += 0.01;
+            renderer.render(scene, camera);
+
+            // extract rendered image
+
+            var w = calcCanvas.width;
+            var h = calcCanvas.height;
+
+            var renderedPixels = new Uint8Array(4 * w * h);
+
+            var gl = renderer.getContext();
+            gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, renderedPixels);
+
+            var renderedImage = new ImageData(new Uint8ClampedArray(renderedPixels), w, h);
+            var ditheredImage = new ImageData(new Uint8ClampedArray(4 * w * h), w, h);
+
+            // dither onto second canvas
+
+            var bayerMatrix = [
+                [1, 9, 3, 11],
+                [13, 5, 15, 7],
+                [4, 12, 2, 10],
+                [16, 8, 14, 6],
+            ]
+
+            for (var y = 0; y < calcCanvas.height; y++) {
+                for (var x = 0; x < calcCanvas.width; x++) {
+                    var i = (y * calcCanvas.width + x) * 4;
+
+                    var brightness = (renderedPixels[i] +
+                        renderedPixels[i+1] +
+                        renderedPixels[i+2]) / 3.0;
+
+                    var limit = 255.0 * bayerMatrix[y % 4][x % 4] / 17.0;
+
+                    if (brightness < limit) {
+                        ditheredImage.data[i] = 0;
+                        ditheredImage.data[i + 1] = 0;
+                        ditheredImage.data[i + 2] = 0;
+                    } else {
+                        ditheredImage.data[i] = 255;
+                        ditheredImage.data[i + 1] = 255;
+                        ditheredImage.data[i + 2] = 255;
+                    }
+
+                    // alpha
+                    ditheredImage.data[i + 3] = 255;
+                }
+            }
+
+            var context = calcCanvas.getContext('2d');
+            context.putImageData(ditheredImage, 0, 0);
+        }
+    </script>
+  </body>
+</html>
