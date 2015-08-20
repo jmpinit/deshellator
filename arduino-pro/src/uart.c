@@ -53,11 +53,11 @@ char uart_available(void) {
     return !(write_ptr==read_ptr);
 }
 
-ISR(USART_RX_vect) {
+/*ISR(USART_RX_vect) {
     cli();
     uart_write_buff(UDR0);
     sei();
-}
+}*/
 
 unsigned char uart_read_buff(void) {
     if (write_ptr==read_ptr) { return 0; }

@@ -1,11 +1,18 @@
 #include <avr/io.h>
 #include <util/delay.h>
+#include <avr/interrupt.h>
 
 #include "uart.h"
 #include "tilp.h"
-#include "image.h"
+//#include "image.h"
+
+#define FRAME_WIDTH     96
+#define FRAME_HEIGHT    64
+#define FRAME_BYTES     (FRAME_WIDTH * FRAME_HEIGHT / 8)
 
 #define KEY_E 0xA6
+
+uint8_t framebuffer[768];
 
 void type_letter(char c) {
     if (c >= '0' && c <= '9') {
@@ -64,8 +71,18 @@ uint8_t hello[] = {
     0x48, 0x69, 0x21, 0x00
 };
 
+volatile int frameIndex = 0;
+
+ISR(USART_RX_vect) {
+    cli();
+    framebuffer[frameIndex] = UDR0;
+    frameIndex++;
+    frameIndex %= FRAME_BYTES;
+    sei();
+}
+
 int main(void) {
-    uart_init(0); // 0 is 2 megabaud
+    uart_init(3); // 0 is 2 megabaud
 
     tilp_init();
 
@@ -74,8 +91,13 @@ int main(void) {
 
     uart_tx_str("hello!\r\n");
 
+    for (int i = 0; i < 768; i++)
+        framebuffer[i] = 0xAA;
+
     for (;;) {
-        tilp_press(KEY_E);
-        _delay_ms(1000);
+        for (int i = 0; i < 768; i++) {
+            tilp_spi(framebuffer[i]);
+        }
+        tilp_init();
     }
 }
