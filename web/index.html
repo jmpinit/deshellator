@@ -36,11 +36,9 @@
     <script>
         var renderer, mesh, scene, camera;
         var calcCanvas;
-
-        var socket = new WebSocket('ws://localhost:4000', 'calc-protocol');
+        var calcImage = new Uint8ClampedArray(96 * 64 / 8);
 
         init();
-        animate();
 
         function init() {
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 10000);
@@ -67,6 +65,8 @@
                 mesh.position.z = 900;
 
                 scene.add(mesh);
+
+                animate();
             });
 
             var ambientLight = new THREE.AmbientLight(0x555555);
@@ -140,8 +140,6 @@
                 }
             }
 
-            var calcImage = new Uint8ClampedArray(w * h / 8);
-
             for (var i = 0; i < w * h / 8; i++) {
                 var byte = 0;
 
@@ -154,13 +152,23 @@
                 calcImage[i] = byte;
             }
 
-            if (socket.readyState == WebSocket.OPEN) {
-                socket.send(calcImage);
-            }
-
             var context = calcCanvas.getContext('2d');
             context.putImageData(ditheredImage, 0, 0);
         }
+
+        var socket = new WebSocket('ws://localhost:4000', 'calc-protocol');
+
+        var fps = 1;
+
+        function calcLoop() {
+            if (socket.readyState == WebSocket.OPEN) {
+                socket.send(calcImage);
+            }
+            console.log('sent');
+            setTimeout(function() { calcLoop(); }, 1000 / fps);
+        }
+
+        calcLoop();
     </script>
   </body>
 </html>
