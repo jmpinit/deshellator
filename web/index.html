@@ -37,6 +37,8 @@
         var renderer, mesh, scene, camera;
         var calcCanvas;
 
+        var socket = new WebSocket('ws://localhost:4000', 'calc-protocol');
+
         init();
         animate();
 
@@ -104,7 +106,6 @@
 
             var renderedImage = new ImageData(new Uint8ClampedArray(renderedPixels), w, h);
             var ditheredImage = new ImageData(new Uint8ClampedArray(4 * w * h), w, h);
-
             // dither onto second canvas
 
             var bayerMatrix = [
@@ -137,6 +138,24 @@
                     // alpha
                     ditheredImage.data[i + 3] = 255;
                 }
+            }
+
+            var calcImage = new Uint8ClampedArray(w * h / 8);
+
+            for (var i = 0; i < w * h / 8; i++) {
+                var byte = 0;
+
+                for (var bit = 0; bit < 8; bit++) {
+                    if (ditheredImage.data[(i * 8 + bit) * 4] > 0) {
+                        byte |= 0x80 >> bit;
+                    }
+                }
+
+                calcImage[i] = byte;
+            }
+
+            if (socket.readyState == WebSocket.OPEN) {
+                socket.send(calcImage);
             }
 
             var context = calcCanvas.getContext('2d');
