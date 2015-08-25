@@ -50,6 +50,8 @@
         var calcCanvas;
         var calcImage = new Uint8ClampedArray(96 * 64 / 8);
         var offset = { x: 0, y: 0 };
+        var rotationHistory = [];
+        var rotationHistorySize = 10;
 
         $("#offset-x").change(function() {
             offset.x = parseInt($(this).val());
@@ -100,7 +102,7 @@
                 });
 
                 mesh = new THREE.Mesh(geometry, material);
-                mesh.scale.set(150, 150, 150);
+                mesh.scale.set(100, 100, 100);
                 mesh.position.x = 0;
                 mesh.position.y = 0;
                 mesh.position.z = 100;
@@ -163,6 +165,31 @@
                     var rz = Math.atan2(rotation[1][0], rotation[1][1]);
                     //camera.projectionMatrix.makeRotationFromEuler(new THREE.Euler(rx, ry, rz, "XYZ"));
 
+                    var rotationHistorySize = 3;
+                    var avgRotation = { x: 0, y: 0, z: 0 };
+
+                    if (rotationHistory.length < rotationHistorySize) {
+                        rotationHistory.push({ x: rx, y: ry, z: rz });
+                    } else {
+                        // shift
+                        for (var i = rotationHistory.length-1; i > 0; i--) {
+                            rotationHistory[i] = rotationHistory[i-1];
+                        }
+                        rotationHistory[0] = { x: rx, y: ry, z: rz };
+
+                        // average
+                        for (var i in rotationHistory) {
+                            var r = rotationHistory[i];
+                            avgRotation.x += r.x;
+                            avgRotation.y += r.y;
+                            avgRotation.z += r.z;
+                        }
+
+                        avgRotation.x /= rotationHistory.length;
+                        avgRotation.y /= rotationHistory.length;
+                        avgRotation.z /= rotationHistory.length;
+                    }
+
                     /*mesh.position.x = t[0];
                     mesh.position.y = -t[1];
                     mesh.position.z = 1200-t[2];*/
@@ -170,12 +197,12 @@
                     mesh.rotation.y = ry;
                     mesh.rotation.z = rz;*/
                     
-                    camera.position.x = t[0];
+                    camera.position.x = -t[0];
                     camera.position.y = t[1];
                     camera.position.z = t[2];
 
                     var lookVector = new THREE.Vector3(0, 0, -1);
-                    lookVector.applyEuler(new THREE.Euler(rx, ry, rz, "XYZ"));
+                    lookVector.applyEuler(new THREE.Euler(avgRotation.x, avgRotation.y, avgRotation.z, "XYZ"));
                     lookVector.add(camera.position);
                     //camera.up = new THREE.Vector3(0, 0, 1);
                     camera.lookAt(lookVector);
