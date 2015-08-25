@@ -2,20 +2,9 @@ var WebSocketServer = require('websocket').server;
 var http = require('http');
 var SerialPort = require("serialport").SerialPort
 
-/*var serialPort = new SerialPort("COM1", {
+var serialPort = new SerialPort("COM37", {
     baudrate: 500000
 });
-
-serialPort.on("open", function () {
-    console.log('open');
-    serialPort.on('data', function(data) {
-        console.log('data received: ' + data);
-    });
-    serialPort.write("ls\n", function(err, results) {
-        console.log('err ' + err);
-        console.log('results ' + results);
-    });
-});*/
 
 var server = http.createServer(function(request, response) {
     console.log((new Date()) + ' Received request for ' + request.url);
@@ -32,6 +21,19 @@ wsServer = new WebSocketServer({
     autoAcceptConnections: false
 });
 
+var TIMEOUT = 5000; // ms
+var lastFrame = null;
+var lastTime = null;
+
+serialPort.on("data", function(data) {
+    console.log("serial: ", data);
+
+    if (lastFrame !== null)
+        serialPort.write(lastFrame);
+
+    lastTime = (new Date()).getTime();
+})
+
 wsServer.on('request', function(request) {
     var connection = request.accept('calc-protocol', request.origin);
     console.log((new Date()) + ' Connection accepted.');
@@ -44,6 +46,14 @@ wsServer.on('request', function(request) {
             console.log('Received Binary Message of ' + message.binaryData.length + ' bytes');
 
             if (message.binaryData.length == 768) {
+                var now = (new Date()).getTime();
+                if (serialPort.isOpen() && (lastTime === null || (now > lastTime + TIMEOUT))) {
+                    serialPort.write(message.binaryData);
+                    lastTime = now;
+                }
+
+                lastFrame = message.binaryData;
+
                 var x = 0;
                 var y = 0;
 
