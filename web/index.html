@@ -9,9 +9,9 @@
   <body>
     <h1>Deshellator Renderer</h1>
 
-    <video id="video" width=320 height=240 autoplay="true" style="display:none;"></video>
+    <video id="video" width=320 height=240 autoplay="true" style="display:none;"></video><br>
 
-    <canvas id="tracking" width=320 height=240></canvas>
+    <canvas id="tracking" width=320 height=240></canvas><br>
     <input id="offset-x" type="range" min="0" max="12" value="0" step="1" /><br>
     <input id="offset-y" type="range" min="0" max="64" value="0" step="1" /><br>
 
@@ -30,15 +30,15 @@
         varying vec2 texCoord;
 
         void main(void) {
-            //gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-            gl_FragColor = texture2D(texture1, texCoord);
+            gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+            //gl_FragColor = texture2D(texture1, texCoord);
         }
 	</script>
 	<script id="vertexShader" type="x-shader/x-vertex">
         varying vec2 texCoord;
 
         void main() {
-            texCoord = uv;
+            //texCoord = uv;
 
             gl_Position =   projectionMatrix *
                             modelViewMatrix *
@@ -82,28 +82,28 @@
         init();
 
         function init() {
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 10000);
-            camera.position.z = 1000;
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+            camera.position.z = 100;
 
             scene = new THREE.Scene();
             var loader = new THREE.JSONLoader();
 
-            loader.load("models/cube-blended.json", function(geometry, materials) {
+            loader.load("models/owen3d.json", function(geometry, materials) {
                 var material = new THREE.ShaderMaterial({
                 	uniforms: {
                 		time: { type: "f", value: 1.0 },
-                		resolution: { type: "v2", value: new THREE.Vector2() },
-                        texture1: { type: "t", value: materials[0].map }
+                		resolution: { type: "v2", value: new THREE.Vector2() }//,
+                        //texture1: { type: "t", value: materials[0].map }
                 	},
                 	vertexShader: document.getElementById('vertexShader').textContent,
                 	fragmentShader: document.getElementById('fragmentShader').textContent
                 });
 
                 mesh = new THREE.Mesh(geometry, material);
-                mesh.scale.set(15, 15, 15);
-                mesh.position.y = 0;
+                mesh.scale.set(150, 150, 150);
                 mesh.position.x = 0;
-                mesh.position.z = 900;
+                mesh.position.y = 0;
+                mesh.position.z = 100;
 
                 scene.add(mesh);
 
@@ -158,19 +158,29 @@
                     //camera.projectionMatrix.setPosition(new THREE.Vector3(t[0], t[1], t[2]));
 
                     var rotation = pose.bestRotation;
-                    var rx = -Math.asin(-rotation[1][2]);
+                    var rx = Math.asin(-rotation[1][2]);
                     var ry = -Math.atan2(rotation[0][2], rotation[2][2]);
                     var rz = Math.atan2(rotation[1][0], rotation[1][1]);
                     //camera.projectionMatrix.makeRotationFromEuler(new THREE.Euler(rx, ry, rz, "XYZ"));
 
-                    mesh.position.x = t[0];
-                    mesh.position.y = t[1];
-                    mesh.position.z = 1100-t[2];
-                    mesh.rotation.x = rx;
+                    /*mesh.position.x = t[0];
+                    mesh.position.y = -t[1];
+                    mesh.position.z = 1200-t[2];*/
+                    /*mesh.rotation.x = rx;
                     mesh.rotation.y = ry;
-                    mesh.rotation.z = rz;
+                    mesh.rotation.z = rz;*/
+                    
+                    camera.position.x = t[0];
+                    camera.position.y = t[1];
+                    camera.position.z = t[2];
+
+                    var lookVector = new THREE.Vector3(0, 0, -1);
+                    lookVector.applyEuler(new THREE.Euler(rx, ry, rz, "XYZ"));
+                    lookVector.add(camera.position);
+                    //camera.up = new THREE.Vector3(0, 0, 1);
+                    camera.lookAt(lookVector);
                 } else {
-                    camera.lookAt(new THREE.Vector3(0, 0, 0));
+                    //camera.lookAt(new THREE.Vector3(0, 0, 0));
                 }
             }
 
