@@ -9,8 +9,17 @@
   <body>
     <h1>Deshellator Renderer</h1>
 
+    <video id="video" width=320 height=240 autoplay="true" style="display:none;"></video>
+
+    <canvas id="tracking" width=320 height=240></canvas>
+
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
     <script src="js/three.min.js"></script>
+    <script type="text/javascript" src="js/svd.js"></script> 
+    <script type="text/javascript" src="js/posit1.js"></script> 
+    <script type="text/javascript" src="js/cv.js"></script> 
+    <script type="text/javascript" src="js/aruco.js"></script>
+
     <script id="fragmentShader" type="x-shader/x-fragment">
 		uniform float time;
 		uniform vec2 resolution;
@@ -36,6 +45,27 @@
     <script>
         var renderer, mesh, scene, camera;
         var calcCanvas;
+
+        var video = document.getElementById("video");
+        var modelSize = 35.0; //millimeters
+
+        navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+        navigator.getUserMedia({ video:true },
+            function (stream) {
+                if (window.URL) {
+                    video.src = window.webkitURL.createObjectURL(stream);
+                } else if (video.mozSrcObject !== undefined) {
+                    video.mozSrcObject = stream;
+                } else {
+                    video.src = stream;
+                }
+            },
+            function(error){ }
+        );
+
+        var detector = new AR.Detector();
+        var posit = new POS.Posit(modelSize, 320);
+        var trackingCanvas = $('#tracking')[0];
 
         init();
         animate();
@@ -83,13 +113,56 @@
             calcCanvas = document.createElement('canvas');
             calcCanvas.width = 96;
             calcCanvas.height = 64;
+            calcCanvas.style.width = '640px';
+            calcCanvas.style.width = '480px';
             document.body.appendChild(calcCanvas);
         }
 
         function animate() {
+            // track
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                var context = trackingCanvas.getContext('2d');
+                context.drawImage(video, 0, 0, trackingCanvas.width, trackingCanvas.height);
+                imageData = context.getImageData(0, 0, trackingCanvas.width, trackingCanvas.height);
+                var markers = detector.detect(imageData);
+
+                if (markers.length > 0) {
+                    //camera.lookAt(new THREE.Vector3(m.corners[0].x, m.corners[0].y, 0));
+
+                    corners = markers[0].corners;
+
+                    for (i = 0; i < corners.length; ++ i){
+                        corner = corners[i];
+
+                        corner.x = corner.x - (trackingCanvas.width / 2);
+                        corner.y = (trackingCanvas.height / 2) - corner.y;
+                    }
+
+                    pose = posit.pose(corners);
+
+                    //console.log(pose);
+                    var t = pose.bestTranslation;
+                    //camera.projectionMatrix.setPosition(new THREE.Vector3(t[0], t[1], t[2]));
+
+                    var rotation = pose.bestRotation;
+                    var rx = -Math.asin(-rotation[1][2]);
+                    var ry = -Math.atan2(rotation[0][2], rotation[2][2]);
+                    var rz = Math.atan2(rotation[1][0], rotation[1][1]);
+                    //camera.projectionMatrix.makeRotationFromEuler(new THREE.Euler(rx, ry, rz, "XYZ"));
+
+                    mesh.position.x = t[0];
+                    mesh.position.y = t[1];
+                    mesh.position.z = 1100-t[2];
+                    mesh.rotation.x = rx;
+                    mesh.rotation.y = ry;
+                    mesh.rotation.z = rz;
+                } else {
+                    camera.lookAt(new THREE.Vector3(0, 0, 0));
+                }
+            }
+
             // render
             requestAnimationFrame(animate);
-            mesh.rotation.y += 0.01;
             renderer.render(scene, camera);
 
             // extract rendered image
