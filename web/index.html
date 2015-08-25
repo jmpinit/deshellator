@@ -12,6 +12,8 @@
     <video id="video" width=320 height=240 autoplay="true" style="display:none;"></video>
 
     <canvas id="tracking" width=320 height=240></canvas>
+    <input id="offset-x" type="range" min="0" max="12" value="0" step="1" /><br>
+    <input id="offset-y" type="range" min="0" max="64" value="0" step="1" /><br>
 
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
     <script src="js/three.min.js"></script>
@@ -28,6 +30,7 @@
         varying vec2 texCoord;
 
         void main(void) {
+            //gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
             gl_FragColor = texture2D(texture1, texCoord);
         }
 	</script>
@@ -39,12 +42,21 @@
 
             gl_Position =   projectionMatrix *
                             modelViewMatrix *
-                            vec4(position,1.0);
+                            vec4(position, 1.0);
         }
 	</script>
     <script>
         var renderer, mesh, scene, camera;
         var calcCanvas;
+        var calcImage = new Uint8ClampedArray(96 * 64 / 8);
+        var offset = { x: 0, y: 0 };
+
+        $("#offset-x").change(function() {
+            offset.x = parseInt($(this).val());
+        });
+        $("#offset-y").change(function() {
+            offset.y = parseInt($(this).val());
+        });
 
         var video = document.getElementById("video");
         var modelSize = 35.0; //millimeters
@@ -68,7 +80,6 @@
         var trackingCanvas = $('#tracking')[0];
 
         init();
-        animate();
 
         function init() {
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 10000);
@@ -95,6 +106,8 @@
                 mesh.position.z = 900;
 
                 scene.add(mesh);
+
+                animate();
             });
 
             var ambientLight = new THREE.AmbientLight(0x555555);
@@ -177,7 +190,6 @@
 
             var renderedImage = new ImageData(new Uint8ClampedArray(renderedPixels), w, h);
             var ditheredImage = new ImageData(new Uint8ClampedArray(4 * w * h), w, h);
-
             // dither onto second canvas
 
             var bayerMatrix = [
@@ -187,34 +199,75 @@
                 [16, 8, 14, 6],
             ]
 
+            var maxIndex = 4 * calcCanvas.width * calcCanvas.height - 1;
+
             for (var y = 0; y < calcCanvas.height; y++) {
                 for (var x = 0; x < calcCanvas.width; x++) {
-                    var i = (y * calcCanvas.width + x) * 4;
+                    var isrc = (y * calcCanvas.width + x) * 4;
+                    var idest = ((calcCanvas.height - 1 - y) * calcCanvas.width + x) * 4;
 
-                    var brightness = (renderedPixels[i] +
-                        renderedPixels[i+1] +
-                        renderedPixels[i+2]) / 3.0;
+                    var brightness = (renderedPixels[isrc] +
+                        renderedPixels[isrc + 1] +
+                        renderedPixels[isrc + 2]) / 3.0;
 
                     var limit = 255.0 * bayerMatrix[y % 4][x % 4] / 17.0;
 
                     if (brightness < limit) {
-                        ditheredImage.data[i] = 0;
-                        ditheredImage.data[i + 1] = 0;
-                        ditheredImage.data[i + 2] = 0;
+                        ditheredImage.data[idest] = 0;
+                        ditheredImage.data[idest + 1] = 0;
+                        ditheredImage.data[idest + 2] = 0;
                     } else {
-                        ditheredImage.data[i] = 255;
-                        ditheredImage.data[i + 1] = 255;
-                        ditheredImage.data[i + 2] = 255;
+                        ditheredImage.data[idest] = 255;
+                        ditheredImage.data[idest + 1] = 255;
+                        ditheredImage.data[idest + 2] = 255;
                     }
 
                     // alpha
-                    ditheredImage.data[i + 3] = 255;
+                    ditheredImage.data[idest + 3] = 255;
                 }
             }
 
             var context = calcCanvas.getContext('2d');
             context.putImageData(ditheredImage, 0, 0);
+
+            var w = 12;
+            var h = 64;
+            var outIndex = 0;
+            var frameOffsetX = offset.x;
+            var frameOffsetY = offset.y;
+
+            for (var y = 0; y < h; y++) {
+                for (var x = 0; x < w; x++) {
+                    var sampleX = (x + frameOffsetX) % w;
+                    var sampleY = (y + frameOffsetY) % h;
+
+                    var sampleIndex = sampleY * w + sampleX;
+                    var byte = 0;
+
+                    for (var bit = 0; bit < 8; bit++) {
+                        if (ditheredImage.data[(sampleIndex * 8 + bit) * 4] > 0) {
+                            byte |= 0x80 >> bit;
+                        }
+                    }
+
+                    calcImage[outIndex++] = byte;
+                }
+            }
         }
+
+        var socket = new WebSocket('ws://localhost:4000', 'calc-protocol');
+
+        var fps = 15;
+
+        function calcLoop() {
+            if (socket.readyState == WebSocket.OPEN) {
+                socket.send(calcImage);
+            }
+
+            setTimeout(function() { calcLoop(); }, 1000 / fps);
+        }
+
+        calcLoop();
     </script>
   </body>
 </html>
