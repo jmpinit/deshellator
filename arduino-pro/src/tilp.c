@@ -5,6 +5,8 @@
 #include "tilp.h"
 #include "uart.h"
 
+#define PIN_SELECT    PD7
+
 unsigned char info[768];
 unsigned char packet[4];
 unsigned int len = 0;
@@ -38,34 +40,52 @@ void tilp_press(uint16_t button) {
 
     tilp_send_packet_raw(p, 4);
 
-    uart_tx_str("press\r\n");
+    //uart_tx_str("press\r\n");
 
-    uart_tx_str("r1: ");
+    //uart_tx_str("r1: ");
     for (unsigned char i = 0; i < 4; i++) {
-        uart_tx_hex(tilp_rx());
-        uart_tx(',');
+        tilp_rx();
+        //uart_tx_hex(tilp_rx());
+        //uart_tx(',');
     }
-    uart_tx_str("\r\n");
+    //uart_tx_str("\r\n");
 
-    uart_tx_str("r2: ");
+    //uart_tx_str("r2: ");
     for (unsigned char i = 0; i < 4; i++) {
-        uart_tx_hex(tilp_rx());
-        uart_tx(',');
+        tilp_rx();
+        //uart_tx_hex(tilp_rx());
+        //uart_tx(',');
     }
-    uart_tx_str("\r\n");
+    //uart_tx_str("\r\n");
 }
 
-void tilp_spi(uint8_t v) {
-    for (int bit = 0; bit < 8; bit++) {
-        tilp_wait_ring_low();
+void select_off() {
+    PORTD &= ~(1 << PIN_SELECT);  // low
+    DDRD |= 1 << PIN_SELECT;      // output
+}
 
-        if (v & (0x80 >> bit))
-            tilp_tip_high();
-        else
-            tilp_tip_low();
+void select_on() {
+    DDRD &= ~(1 << PIN_SELECT);   // input
+    PORTD |= 1 << PIN_SELECT;     // hiZ
+}
 
-        tilp_wait_ring_high();
+void tilp_spi(uint8_t* buffer, int len) {
+    select_on();
+
+    for (int i = 0; i < len; i++) {
+        for (int bit = 0; bit < 8; bit++) {
+            tilp_wait_ring_low();
+
+            if (buffer[i] & (0x80 >> bit))
+                tilp_tip_high();
+            else
+                tilp_tip_low();
+
+            tilp_wait_ring_high();
+        }
     }
+
+    select_off();
 }
 
 void tilp_receive_packet() {
@@ -90,15 +110,10 @@ int tilp_send_packet_raw(unsigned char* data, unsigned int len) {
     for (unsigned int i = 0; i < len; i++) {
         res = tilp_tx(data[i]);
         if (res < 0) {
-            // FIXME
-            uart_tx_str("failed after ");
-            uart_tx_hex(i);
-            uart_tx_str("\r\n");
             return res;
         }
     }
 
-    uart_tx_str("packet raw\r\n");
     return 0;
 }
 
@@ -146,7 +161,7 @@ void tilp_tip_low() {
 
 #define TIMEOUT 250000*8
 
-int tilp_wait_ring_high() {
+inline int tilp_wait_ring_high() {
     long t;
     for (t = 0; t < TIMEOUT && !(PIN_TI & (1 << TI_RING)); t++)
         __asm__("nop\n\t");
@@ -157,7 +172,7 @@ int tilp_wait_ring_high() {
         return 1;
 }
 
-int tilp_wait_tip_high() {
+inline int tilp_wait_tip_high() {
     long t;
     for (t = 0; t < TIMEOUT && !(PIN_TI & (1 << TI_TIP)); t++)
         __asm__("nop\n\t");
@@ -168,7 +183,7 @@ int tilp_wait_tip_high() {
         return 1;
 }
 
-int tilp_wait_ring_low() {
+inline int tilp_wait_ring_low() {
     long t;
     for (t = 0; t < TIMEOUT && (PIN_TI & (1 << TI_RING)); t++)
         __asm__("nop\n\t");
@@ -179,7 +194,7 @@ int tilp_wait_ring_low() {
         return 1;
 }
 
-int tilp_wait_tip_low() {
+inline int tilp_wait_tip_low() {
     long t;
     for (t = 0; t < TIMEOUT && (PIN_TI & (1 << TI_TIP)); t++)
         __asm__("nop\n\t");
@@ -238,45 +253,35 @@ int tilp_tx(unsigned char msg) {
 
     for (int bit = 0; bit < 8; bit++) {
         if (msg & (1 << bit)) {
-            uart_tx('1'); // FIXME
-
             tilp_ring_low();
             res = tilp_wait_tip_low();
             if (res < 0) {
                 tilp_init();
-                uart_tx('a'); // FIXME
                 return res;
             }
             tilp_ring_high();
             res = tilp_wait_tip_high();
             if (res < 0) {
                 tilp_init();
-                uart_tx('b'); // FIXME
                 return res;
             }
         } else {
-            uart_tx('0'); // FIXME
-
             tilp_tip_low();
             res = tilp_wait_ring_low();
             if (res < 0) {
                 tilp_init();
-                uart_tx('c'); // FIXME
                 return res;
             }
             tilp_tip_high();
             res = tilp_wait_ring_high();
             if (res < 0) {
                 tilp_init();
-                uart_tx('d'); // FIXME
                 return res;
             }
         }
     }
 
     tilp_init();
-
-    uart_tx_str(" tx\r\n");
 
     return 0;
 }

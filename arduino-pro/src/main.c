@@ -1,10 +1,13 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
+#include <stdbool.h>
 
 #include "uart.h"
 #include "tilp.h"
 //#include "image.h"
+
+#define LISTEN sei
 
 #define FRAME_WIDTH     96
 #define FRAME_HEIGHT    64
@@ -72,13 +75,19 @@ uint8_t hello[] = {
 };
 
 volatile int frameIndex = 0;
+volatile bool frameReady = true;//false;
 
 ISR(USART_RX_vect) {
     cli();
-    framebuffer[frameIndex] = UDR0;
-    frameIndex++;
-    frameIndex %= FRAME_BYTES;
-    sei();
+
+    framebuffer[frameIndex++] = UDR0;
+    
+    if (frameIndex >= 768) {
+        frameReady = true;
+        frameIndex = 0;
+    } else {
+        sei();
+    }
 }
 
 int main(void) {
@@ -91,13 +100,21 @@ int main(void) {
 
     uart_tx_str("hello!\r\n");
 
+    // signature for sync
+    framebuffer[3] = 0x84;
+    framebuffer[2] = 0xa4;
+    framebuffer[1] = 0x2e;
+    framebuffer[0] = 0xe5;
+
     for (int i = 0; i < 768; i++)
         framebuffer[i] = 0xAA;
 
     for (;;) {
-        for (int i = 0; i < 768; i++) {
-            tilp_spi(framebuffer[i]);
-        }
-        tilp_init();
+        uart_tx('a'); // ask for a new frame
+
+        LISTEN();
+        while (!frameReady);
+
+        tilp_spi(framebuffer, 768);
     }
 }

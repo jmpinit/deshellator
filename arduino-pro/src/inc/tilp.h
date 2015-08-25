@@ -44,7 +44,7 @@
 
 void tilp_init();
 void tilp_press(uint16_t button);
-void tilp_spi(uint8_t v);
+void tilp_spi(uint8_t* buffer, int len);
 int tilp_tx(uint8_t v);
 int tilp_rx(void);
 
