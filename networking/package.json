@@ -3,7 +3,10 @@
     "version": "0.0.0",
     "description": "Stream images to a calculator from a web browser.",
     "author": "Owen Trueblood <hi@owentrueblood.me>",
-    "main": "server.js",
+    "main": "main.js",
+    "scripts": {
+        "start": "node main.js"
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/jmptable/deshellator"
